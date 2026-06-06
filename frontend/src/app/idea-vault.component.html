@@ -1,0 +1,234 @@
+<section class="flex-1 flex flex-col relative overflow-hidden">
+  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-fuchsia-600/10 blur-[120px] rounded-full pointer-events-none z-0"></div>
+
+  <header class="h-20 flex items-center justify-between px-8 z-10 relative border-b border-slate-700/30 bg-slate-900/50 backdrop-blur-md">
+    <div>
+      <h2 class="text-2xl font-bold text-white tracking-tight">Idea Vault</h2>
+      <p class="text-sm text-slate-400 mt-1">Capture and refine your next viral video.</p>
+    </div>
+    <div class="flex items-center space-x-4">
+      <button
+        type="button"
+        (click)="openCreate()"
+        data-testid="new-idea-button"
+        class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium rounded-full text-sm px-6 py-2.5 text-center shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 hover:-translate-y-0.5 active:translate-y-0"
+      >
+        + New Idea
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 overflow-auto p-8 z-10 relative">
+    @if (isLoading()) {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="loading-grid">
+        @for (_ of [0, 1, 2, 3, 4, 5]; track $index) {
+          <div class="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 h-48 animate-pulse"></div>
+        }
+      </div>
+    } @else if (loadError()) {
+      <div class="bg-rose-500/10 border border-rose-500/30 text-rose-200 rounded-2xl p-6 max-w-xl">
+        <p class="font-medium mb-2">{{ loadError() }}</p>
+        <button
+          type="button"
+          (click)="loadIdeas()"
+          class="mt-2 px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        @for (idea of ideas(); track trackById($index, idea)) {
+          <div
+            class="group bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:bg-slate-800/60 hover:border-violet-500/50 transition-all relative overflow-hidden flex flex-col"
+            data-testid="idea-card"
+          >
+            <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-fuchsia-500 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+            <div class="flex justify-between items-start mb-4 gap-2">
+              <select
+                [value]="idea.status"
+                (change)="changeStatus(idea, $any($event.target).value)"
+                data-testid="status-select"
+                class="text-xs font-semibold rounded-full border px-2.5 py-1 outline-none cursor-pointer appearance-none"
+                [class]="statusClass(idea.status)"
+              >
+                @for (status of statuses; track status) {
+                  <option class="bg-slate-800 text-slate-100" [value]="status">{{ status }}</option>
+                }
+              </select>
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  (click)="openEdit(idea)"
+                  class="text-slate-500 hover:text-violet-300 transition-colors p-1"
+                  aria-label="Edit idea"
+                  data-testid="edit-button"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                    <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  (click)="deleteIdea(idea)"
+                  class="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                  aria-label="Delete idea"
+                  data-testid="delete-button"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-1 1v1H4a1 1 0 100 2h12a1 1 0 100-2h-4V3a1 1 0 00-1-1H9zM5 8a1 1 0 011 1v7a1 1 0 102 0V9a1 1 0 112 0v7a1 1 0 102 0V9a1 1 0 112 0v7a3 3 0 01-3 3H8a3 3 0 01-3-3V9a1 1 0 011-1z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <h3 class="text-lg font-semibold text-white mb-2 group-hover:text-violet-400 transition-colors line-clamp-2">
+              {{ idea.title }}
+            </h3>
+            <p class="text-slate-400 text-sm mb-4 line-clamp-3 flex-1">
+              {{ idea.description || 'No description yet.' }}
+            </p>
+
+            <div class="flex items-center text-xs text-slate-500 mt-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {{ idea.createdAt | date: 'shortDate' }}
+            </div>
+          </div>
+        }
+
+        @if (ideas().length === 0) {
+          <div
+            (click)="openCreate()"
+            class="col-span-full border-2 border-dashed border-slate-700/50 rounded-2xl p-12 hover:border-slate-500 transition-all cursor-pointer flex flex-col items-center justify-center text-center opacity-70 hover:opacity-100"
+            data-testid="empty-state"
+          >
+            <div class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-medium text-slate-200 mb-1">No ideas yet</h3>
+            <p class="text-sm text-slate-400">Click here to capture your first one.</p>
+          </div>
+        } @else {
+          <div
+            (click)="openCreate()"
+            class="border-2 border-dashed border-slate-700/50 rounded-2xl p-6 hover:border-slate-500 transition-all cursor-pointer flex flex-col items-center justify-center text-center opacity-70 hover:opacity-100 min-h-[200px]"
+            data-testid="add-card"
+          >
+            <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h3 class="text-base font-medium text-slate-300 hover:text-white transition-colors">Brainstorm new idea</h3>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+@if (isModalOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" (click)="closeModal()"></div>
+
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 relative z-10" data-testid="idea-modal">
+      <h3 class="text-xl font-bold text-white mb-4">
+        {{ modalMode() === 'create' ? 'Capture New Idea' : 'Edit Idea' }}
+      </h3>
+
+      <div class="space-y-4">
+        <div>
+          <label for="idea-title" class="block text-sm font-medium text-slate-300 mb-1">
+            Title <span class="text-rose-400">*</span>
+          </label>
+          <input
+            id="idea-title"
+            type="text"
+            placeholder="e.g., How I built this app in 10 minutes"
+            [ngModel]="formTitle()"
+            (ngModelChange)="formTitle.set($event)"
+            name="title"
+            data-testid="title-input"
+            class="w-full bg-slate-900 border rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-600"
+            [class.border-rose-500]="titleError()"
+            [class.border-slate-700]="!titleError()"
+            maxlength="200"
+            required
+          />
+          <div class="flex justify-between items-center mt-1 text-xs">
+            <span class="text-rose-400">{{ titleError() }}</span>
+            <span class="text-slate-500">{{ titleCount() }}/200</span>
+          </div>
+        </div>
+
+        <div>
+          <label for="idea-description" class="block text-sm font-medium text-slate-300 mb-1">
+            Description / Notes
+          </label>
+          <textarea
+            id="idea-description"
+            rows="4"
+            placeholder="Jot down some key points..."
+            [ngModel]="formDescription()"
+            (ngModelChange)="formDescription.set($event)"
+            name="description"
+            data-testid="description-input"
+            class="w-full bg-slate-900 border rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-600 resize-none"
+            [class.border-rose-500]="descriptionError()"
+            [class.border-slate-700]="!descriptionError()"
+            maxlength="5000"
+          ></textarea>
+          <div class="flex justify-end items-center mt-1 text-xs">
+            <span class="text-slate-500">{{ descriptionCount() }}/5000</span>
+          </div>
+        </div>
+
+        <div>
+          <label for="idea-status" class="block text-sm font-medium text-slate-300 mb-1">Status</label>
+          <select
+            id="idea-status"
+            [ngModel]="formStatus()"
+            (ngModelChange)="formStatus.set($event)"
+            name="status"
+            data-testid="modal-status-select"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+          >
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ status }}</option>
+            }
+          </select>
+        </div>
+
+        @if (modalError()) {
+          <p class="text-sm text-rose-300" data-testid="modal-error">{{ modalError() }}</p>
+        }
+      </div>
+
+      <div class="mt-6 flex justify-end space-x-3">
+        <button
+          type="button"
+          (click)="closeModal()"
+          [disabled]="isSaving()"
+          class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          (click)="save()"
+          [disabled]="isSaving() || hasFormErrors()"
+          data-testid="save-button"
+          class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {{ isSaving() ? 'Saving...' : (modalMode() === 'create' ? 'Save Idea' : 'Update Idea') }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

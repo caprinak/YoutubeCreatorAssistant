@@ -1,5 +1,5 @@
-<div class="flex h-screen bg-slate-900 text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white relative">
-  
+<div class="flex h-screen bg-slate-900 text-slate-100 font-sans selection:bg-fuchsia-500 selection:text-white relative overflow-hidden">
+
   <!-- Sidebar -->
   <aside class="w-64 bg-slate-800/50 backdrop-blur-xl border-r border-slate-700/50 flex flex-col transition-all duration-300 relative z-20">
     <div class="p-6 flex items-center space-x-3">
@@ -16,15 +16,23 @@
 
     <nav class="flex-1 px-4 py-6 space-y-2">
       <p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Workspace</p>
-      
-      <a href="#" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)] transition-all">
+
+      <a
+        routerLink="/ideas"
+        routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+        class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
         <span class="font-medium">Idea Vault</span>
       </a>
 
-      <a href="#" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group">
+      <a
+        routerLink="/kanban"
+        routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+        class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
@@ -34,98 +42,9 @@
   </aside>
 
   <!-- Main Content Area -->
-  <main class="flex-1 flex flex-col relative overflow-hidden">
-    
-    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-fuchsia-600/10 blur-[120px] rounded-full pointer-events-none z-0"></div>
+  <router-outlet />
 
-    <header class="h-20 flex items-center justify-between px-8 z-10 relative border-b border-slate-700/30 bg-slate-900/50 backdrop-blur-md">
-      <div>
-        <h2 class="text-2xl font-bold text-white tracking-tight">Idea Vault</h2>
-        <p class="text-sm text-slate-400 mt-1">Capture and refine your next viral video.</p>
-      </div>
-
-      <div class="flex items-center space-x-4">
-        <button (click)="openModal()" class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium rounded-full text-sm px-6 py-2.5 text-center shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 hover:-translate-y-0.5 active:translate-y-0">
-          + New Idea
-        </button>
-      </div>
-    </header>
-
-    <div class="flex-1 overflow-auto p-8 z-10 relative">
-      
-      <!-- Ideas Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        <!-- Loop through ideas from the backend -->
-        @for (idea of ideas(); track idea.id) {
-          <div class="group bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 hover:bg-slate-800/60 hover:border-violet-500/50 transition-all cursor-pointer relative overflow-hidden flex flex-col">
-            <div class="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-fuchsia-500 to-violet-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
-            <div class="flex justify-between items-start mb-4">
-              <span class="bg-violet-500/20 text-violet-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-violet-500/30">
-                {{ idea.status }}
-              </span>
-              <button (click)="deleteIdea(idea.id)" class="text-slate-500 hover:text-red-400 transition-colors z-10">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                </svg>
-              </button>
-            </div>
-            
-            <h3 class="text-lg font-semibold text-white mb-2 group-hover:text-violet-400 transition-colors">{{ idea.title }}</h3>
-            <p class="text-slate-400 text-sm mb-4 line-clamp-3 flex-1">{{ idea.description }}</p>
-            
-            <div class="flex items-center text-xs text-slate-500 mt-auto">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {{ idea.createdAt | date:'shortDate' }}
-            </div>
-          </div>
-        }
-
-        <!-- Add New Idea Card -->
-        <div (click)="openModal()" class="group border-2 border-dashed border-slate-700/50 rounded-2xl p-6 hover:border-slate-500 transition-all cursor-pointer flex flex-col items-center justify-center text-center opacity-70 hover:opacity-100 min-h-[200px]">
-          <div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3">
-             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-slate-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <h3 class="text-base font-medium text-slate-300 group-hover:text-white transition-colors">Brainstorm new idea</h3>
-        </div>
-      </div>
-    </div>
-  </main>
 </div>
 
-<!-- Create Idea Modal -->
-@if (isModalOpen()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" (click)="closeModal()"></div>
-    
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 relative z-10">
-      <h3 class="text-xl font-bold text-white mb-4">Capture New Idea</h3>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1">Title</label>
-          <input [(ngModel)]="newIdeaTitle" type="text" placeholder="e.g., How I built this app in 10 minutes" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-600">
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1">Description / Notes</label>
-          <textarea [(ngModel)]="newIdeaDescription" rows="4" placeholder="Jot down some key points..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all placeholder-slate-600 resize-none"></textarea>
-        </div>
-      </div>
-
-      <div class="mt-6 flex justify-end space-x-3">
-        <button (click)="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
-          Cancel
-        </button>
-        <button (click)="saveIdea()" class="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-violet-500/20">
-          Save Idea
-        </button>
-      </div>
-    </div>
-  </div>
-}
+<app-toast-host />
+<app-confirm-dialog />

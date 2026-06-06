@@ -1,16 +1,76 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "./generated"
 }
 
 datasource db {
   provider = "sqlite"
 }
 
+model Channel {
+  id        String   @id @default(uuid())
+  name      String
+  handle    String   @unique
+  niche     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ideas    Idea[]
+  personas AudiencePersona[]
+  brandKit BrandKit?
+}
+
+model AudiencePersona {
+  id            String  @id @default(uuid())
+  channelId     String
+  name          String
+  demographics  String?
+  painPoints    String?
+  ideas         Idea[]
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+}
+
+model BrandKit {
+  id         String  @id @default(uuid())
+  channelId  String  @unique
+  colors     String?
+  typography String?
+  logoUrl    String?
+  bannerUrl  String?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+  color String?
+
+  ideas IdeaTag[]
+}
+
+model IdeaTag {
+  ideaId String
+  tagId  String
+
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ideaId, tagId])
+}
+
 model Idea {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  status      String   @default("RESEARCHING")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String  @id @default(uuid())
+  channelId         String
+  audiencePersonaId String?
+  title             String
+  description       String?
+  status            String  @default("RESEARCHING")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  channel Channel          @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  persona AudiencePersona? @relation(fields: [audiencePersonaId], references: [id], onDelete: SetNull)
+  tags    IdeaTag[]
 }

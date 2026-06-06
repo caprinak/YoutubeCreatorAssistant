@@ -61,13 +61,18 @@ const { mockIdeas, mockPrisma, resetMockDb } = vi.hoisted(() => {
   return { mockIdeas: ideas, mockPrisma: prisma, resetMockDb: reset };
 });
 
-vi.mock('@prisma/client', () => ({
+const { PrismaClientKnownRequestError } = vi.hoisted(() => {
+  class CustomError extends Error {};
+  return { PrismaClientKnownRequestError: CustomError };
+});
+
+vi.mock('./prisma/generated/client.ts', () => ({
   PrismaClient: class {
     constructor() {
       return mockPrisma;
     }
   },
-  Prisma: { PrismaClientKnownRequestError: class extends Error {} },
+  Prisma: { PrismaClientKnownRequestError },
 }));
 
 import { app } from './server';

@@ -1,10 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from './prisma/generated/client.ts';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 import 'dotenv/config';
 
 const app = express();
-const prisma = new PrismaClient();
+const adapter = new PrismaLibSql({ url: process.env.DATABASE_URL ?? 'file:./dev.db' });
+const prisma = new PrismaClient({ adapter });
 
 const PORT = Number(process.env.PORT) || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:4200';

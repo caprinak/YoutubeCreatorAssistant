@@ -1,82 +1,90 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import 'dotenv/config';
+import { PrismaClient } from './prisma/generated/client.ts';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DB_FILE = path.join(__dirname, 'db.json');
+const adapter = new PrismaLibSql({ url: process.env.DATABASE_URL ?? 'file:./dev.db' });
+const prisma = new PrismaClient({ adapter });
 
-const sampleIdeas = [
+const ideas = [
   {
-    id: 'sample-1',
-    title: 'I Built a Web App in 24 Hours Using Only AI Agents',
-    description: 'Detailed log of trying to build a full-stack SaaS app using AI coding agents. Discussing the prompts, the failures, the successes, and the final cost/time breakdown.',
+    title: 'How I Built a Faceless YouTube Channel in 30 Days',
+    description: 'Walkthrough of tools, workflow, and earnings from a zero-face channel. Covers AI voiceover, stock footage, keyword research.',
     status: 'COMPLETED',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(), // 7 days ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString()
   },
   {
-    id: 'sample-2',
-    title: 'Why I Stopped Using Tailwind CSS (And What I Use Instead)',
-    description: 'Deep dive comparison between Tailwind, vanilla CSS, CSS modules, and CSS-in-JS. Addressing performance, maintenance overhead, and workflow speeds.',
-    status: 'EDITING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString()
+    title: '5 AI Tools That Saved Me 20 Hours This Week',
+    description: 'Roundup of the most underrated AI tools for content creators. Includes scripting, thumbnail design, and analytics.',
+    status: 'COMPLETED',
   },
   {
-    id: 'sample-3',
-    title: 'Is Angular 21 the Best Frontend Framework in 2026?',
-    description: 'Hands-on walkthrough of the new features in Angular 21 (signal-based routing, reactivity, faster builds) and how it stacks up against Next.js.',
-    status: 'SCRIPTING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(), // 3 days ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString()
+    title: 'My Video Went Viral — Here Is What I Learned',
+    description: 'Post-mortem of a viral video: CTR, audience retention graph breakdown, thumbnail A/B test results, and the algorithm luck factor.',
+    status: 'IN_PROGRESS',
   },
   {
-    id: 'sample-4',
-    title: 'The Ultimate Clean Code Checklist for Junior Devs',
-    description: 'Visual guide going through 10 essential refactoring rules: naming conventions, keeping functions small, avoiding nested conditionals, and writing unit tests.',
+    title: 'The Perfect YouTube Upload Schedule (Data-Backed)',
+    description: 'Analyzing 100+ channels to find the optimal upload frequency, day, and time. Charts and raw data included.',
+    status: 'IN_PROGRESS',
+  },
+  {
+    title: 'I Tried 10 Thumbnail Styles — This One Won',
+    description: 'Eye-tracking heatmap experiment comparing thumbnail styles. Face close-up vs. text overlay vs. curiosity gap comparison.',
     status: 'PLANNING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), // 2 days ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString()
   },
   {
-    id: 'sample-5',
-    title: 'How Web Developers Can Get Their First Freelance Client',
-    description: 'Practical strategies for portfolio building, finding clients on specialized platforms, cold-outreach emails, and negotiating project rates.',
-    status: 'RESEARCHING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), // 12 hours ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
-  },
-  {
-    id: 'sample-6',
-    title: 'Inside a Tech Lead\'s Desk Setup (Aesthetic & Ergonomic)',
-    description: 'B-roll heavy tour of my new workspace showing the standing desk, mechanical keyboard build, monitor setup, and cable management strategies.',
-    status: 'FILMING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString()
-  },
-  {
-    id: 'sample-7',
-    title: 'How to Get 90% Test Coverage Without Losing Your Sanity',
-    description: 'Explain test mocking, unit testing vs integration testing, coverage metrics, and automating coverage checks in CI pipelines.',
+    title: 'YouTube Studio Hidden Features You Are Not Using',
+    description: 'Deep dive into YouTube Studio analytics most creators ignore: traffic source details, unique vs. returning viewers, key moments.',
     status: 'PLANNING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), // 6 hours ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString()
   },
   {
-    id: 'sample-8',
-    title: 'I Tried Every CSS Framework So You Don\'t Have To',
-    description: 'A comprehensive review of Bootstrap, Bulma, Tailwind, Pico.css, and vanilla CSS for different project sizes.',
+    title: 'Faceless vs. Face Channel — Which Grows Faster?',
+    description: 'Side-by-side comparison of two identical channels — one with face, one without. Growth metrics after 60 days.',
     status: 'RESEARCHING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
-  }
+  },
+  {
+    title: 'How to Script a Video in 15 Minutes (Template)',
+    description: 'Free downloadable hook-body-outro template. Examples from top creators deconstructed line by line.',
+    status: 'RESEARCHING',
+  },
+  {
+    title: 'Why Your Retention Drops in the First 30 Seconds',
+    description: 'Data analysis of retention graphs from real channels. Common mistakes in intros and how to fix them using proven patterns.',
+    status: 'RESEARCHING',
+  },
+  {
+    title: 'I Automated My Entire YouTube Workflow — Here Is The Stack',
+    description: 'End-to-end automation from research to publishing. Tools used: n8n, ChatGPT, Canva API, YouTube Data API.',
+    status: 'PLANNING',
+  },
+  {
+    title: 'The CTR Game: Writing Titles That Get Clicked',
+    description: 'Psychology-backed title formulas. Power words, number patterns, and curiosity gap techniques with before/after examples.',
+    status: 'RESEARCHING',
+  },
+  {
+    title: 'Best Niches for New Creators in 2026',
+    description: 'Competition vs. demand analysis across 20 niches. CPM estimates, barrier to entry, and content saturation ratings.',
+    status: 'PLANNING',
+  },
 ];
 
-function seed() {
-  console.log('Starting DB seed process...');
-  fs.writeFileSync(DB_FILE, JSON.stringify({ ideas: sampleIdeas }, null, 2));
-  console.log(`Database seeded successfully with ${sampleIdeas.length} sample items!`);
+async function seed() {
+  const count = await prisma.idea.count();
+  if (count > 0) {
+    console.log(`Database already has ${count} ideas. Clearing and re-seeding...`);
+    await prisma.idea.deleteMany();
+  }
+
+  for (const idea of ideas) {
+    await prisma.idea.create({ data: idea });
+    console.log(`  ✓ ${idea.title}`);
+  }
+
+  console.log(`\nSeeded ${ideas.length} ideas successfully.`);
+  await prisma.$disconnect();
 }
 
-seed();
+seed().catch((err) => {
+  console.error('Seed failed:', err);
+  process.exit(1);
+});
