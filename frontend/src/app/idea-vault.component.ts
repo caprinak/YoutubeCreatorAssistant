@@ -1,9 +1,13 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IdeaService, Idea, IdeaInput, IDEA_STATUSES } from './idea.service';
+import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { IdeaService, Idea, IdeaInput, IDEA_STATUSES, AudiencePersona, Tag, IdeaTag } from './idea.service';
+import { ChannelService } from './channel.service';
 import { ToastService } from './toast.service';
 import { ConfirmService } from './confirm.service';
+import { statusBadge } from './idea-status.constants';
 
 type Mode = 'create' | 'edit';
 
@@ -14,16 +18,23 @@ type Mode = 'create' | 'edit';
   templateUrl: './idea-vault.component.html',
   styleUrl: './idea-vault.component.css',
 })
-export class IdeaVaultComponent implements OnInit {
+export class IdeaVaultComponent implements OnDestroy {
   private ideaService = inject(IdeaService);
+  private channelService = inject(ChannelService);
   private toasts = inject(ToastService);
   private confirm = inject(ConfirmService);
+  private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   readonly statuses = IDEA_STATUSES;
 
+  channelId = signal<string | null>(null);
   ideas = signal<Idea[]>([]);
   isLoading = signal(true);
   loadError = signal<string | null>(null);
+
+  personas = signal<AudiencePersona[]>([]);
+  availableTags = signal<Tag[]>([]);
 
   isModalOpen = signal(false);
   modalMode = signal<Mode>('create');
@@ -34,6 +45,17 @@ export class IdeaVaultComponent implements OnInit {
   formTitle = signal('');
   formDescription = signal('');
   formStatus = signal<string>('RESEARCHING');
+  formPersonaId = signal<string | null>(null);
+  formTagIds = signal<string[]>([]);
+
+  private loadIdeasSubscription?: Subscription;
+  private loadPersonasSubscription?: Subscription;
+  private loadTagsSubscription?: Subscription;
+
+  constructor() {
+    const initialId = this.route.snapshot.paramMap.get('channelId');
+    this.channelId.set(initialId);
+  }
 
   titleError = computed(() => {
     const t = this.formTitle().trim();
@@ -54,13 +76,42 @@ export class IdeaVaultComponent implements OnInit {
   descriptionCount = computed(() => this.formDescription().length);
 
   ngOnInit(): void {
-    this.loadIdeas();
+    const id = this.channelId();
+    if (id) {
+      this.loadIdeas();
+      this.loadPersonas();
+    }
+
+    const sub = this.route.paramMap.subscribe(params => {
+      const newId = params.get('channelId');
+      if (newId && newId !== this.channelId()) {
+        this.channelId.set(newId);
+        this.loadIdeas();
+        this.loadPersonas();
+      }
+    });
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
+
+    this.loadTags();
+  }
+
+  ngOnDestroy(): void {
+    this.loadIdeasSubscription?.unsubscribe();
+    this.loadPersonasSubscription?.unsubscribe();
+    this.loadTagsSubscription?.unsubscribe();
   }
 
   loadIdeas(): void {
+    const channelId = this.channelId();
+    if (!channelId) {
+      this.ideas.set([]);
+      this.isLoading.set(false);
+      return;
+    }
+    this.loadIdeasSubscription?.unsubscribe();
     this.isLoading.set(true);
     this.loadError.set(null);
-    this.ideaService.getIdeas().subscribe({
+    this.loadIdeasSubscription = this.ideaService.getIdeas({ channelId }).subscribe({
       next: (ideas) => {
         this.ideas.set(ideas);
         this.isLoading.set(false);
@@ -73,12 +124,32 @@ export class IdeaVaultComponent implements OnInit {
     });
   }
 
+  loadPersonas(): void {
+    const channelId = this.channelId();
+    if (!channelId) { this.personas.set([]); return; }
+    this.loadPersonasSubscription?.unsubscribe();
+    this.loadPersonasSubscription = this.channelService.getPersonas(channelId).subscribe({
+      next: (personas) => this.personas.set(personas),
+      error: () => this.toasts.error('Failed to load personas.'),
+    });
+  }
+
+  loadTags(): void {
+    this.loadTagsSubscription?.unsubscribe();
+    this.loadTagsSubscription = this.channelService.getTags().subscribe({
+      next: (tags) => this.availableTags.set(tags),
+      error: () => this.toasts.error('Failed to load tags.'),
+    });
+  }
+
   openCreate(): void {
     this.modalMode.set('create');
     this.editingId.set(null);
     this.formTitle.set('');
     this.formDescription.set('');
     this.formStatus.set('RESEARCHING');
+    this.formPersonaId.set(null);
+    this.formTagIds.set([]);
     this.modalError.set(null);
     this.isModalOpen.set(true);
   }
@@ -89,6 +160,8 @@ export class IdeaVaultComponent implements OnInit {
     this.formTitle.set(idea.title);
     this.formDescription.set(idea.description ?? '');
     this.formStatus.set(idea.status);
+    this.formPersonaId.set(idea.audiencePersonaId);
+    this.formTagIds.set(idea.tags?.map((t: IdeaTag) => t.tagId) ?? []);
     this.modalError.set(null);
     this.isModalOpen.set(true);
   }
@@ -99,9 +172,21 @@ export class IdeaVaultComponent implements OnInit {
     this.modalError.set(null);
   }
 
+  toggleTag(tagId: string): void {
+    this.formTagIds.update((ids) =>
+      ids.includes(tagId) ? ids.filter((id) => id !== tagId) : [...ids, tagId]
+    );
+  }
+
   save(): void {
     if (this.hasFormErrors()) {
       this.modalError.set('Please fix the highlighted fields.');
+      return;
+    }
+
+    const channelId = this.channelId();
+    if (!channelId) {
+      this.modalError.set('No channel selected.');
       return;
     }
 
@@ -112,6 +197,9 @@ export class IdeaVaultComponent implements OnInit {
       title: this.formTitle().trim(),
       description: this.formDescription().trim() || null,
       status: this.formStatus(),
+      channelId,
+      audiencePersonaId: this.formPersonaId(),
+      tagIds: this.formTagIds(),
     };
 
     const mode = this.modalMode();
@@ -169,34 +257,21 @@ export class IdeaVaultComponent implements OnInit {
     this.ideas.update((list) =>
       list.map((i) => (i.id === idea.id ? { ...i, status: newStatus } : i))
     );
-    this.ideaService.updateIdea(idea.id, { status: newStatus }).subscribe({
+    this.ideaService.updateIdea(idea.id, { status: newStatus, channelId: idea.channelId }).subscribe({
       next: (updated) => {
         this.ideas.update((list) => list.map((i) => (i.id === idea.id ? updated : i)));
         this.toasts.info(`Status set to ${newStatus}.`);
       },
-      error: (err) => {
+      error: () => {
         this.ideas.set(previous);
-        this.toasts.error(this.errorMessage(err, 'Could not update status.'));
+        this.toasts.error('Could not update status.');
       },
     });
   }
 
-  trackById = (_: number, idea: Idea): string => idea.id;
+  readonly statusBadge = statusBadge;
 
-  statusClass(status: string): string {
-    switch (status) {
-      case 'RESEARCHING':
-        return 'bg-violet-500/20 text-violet-300 border-violet-500/30';
-      case 'PLANNING':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-      case 'IN_PROGRESS':
-        return 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-      case 'COMPLETED':
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-      default:
-        return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
-    }
-  }
+  trackById = (_: number, idea: Idea): string => idea.id;
 
   private errorMessage(err: unknown, fallback: string): string {
     if (err && typeof err === 'object' && 'error' in err) {

@@ -51,7 +51,7 @@
                 (change)="changeStatus(idea, $any($event.target).value)"
                 data-testid="status-select"
                 class="text-xs font-semibold rounded-full border px-2.5 py-1 outline-none cursor-pointer appearance-none"
-                [class]="statusClass(idea.status)"
+                [class]="statusBadge(idea.status)"
               >
                 @for (status of statuses; track status) {
                   <option class="bg-slate-800 text-slate-100" [value]="status">{{ status }}</option>
@@ -90,6 +90,27 @@
             <p class="text-slate-400 text-sm mb-4 line-clamp-3 flex-1">
               {{ idea.description || 'No description yet.' }}
             </p>
+
+            @if (idea.tags && idea.tags.length > 0) {
+              <div class="flex flex-wrap gap-1.5 mb-3">
+                @for (it of idea.tags; track it.tagId) {
+                  <span
+                    class="text-[10px] font-medium px-2 py-0.5 rounded-full border"
+                    [style.border-color]="it.tag.color ?? '#8B5CF6'"
+                    [style.color]="it.tag.color ?? '#8B5CF6'"
+                    [style.background-color]="(it.tag.color ?? '#8B5CF6') + '15'"
+                  >
+                    {{ it.tag.name }}
+                  </span>
+                }
+              </div>
+            }
+
+            @if (idea.persona) {
+              <div class="text-xs text-slate-500 mb-2">
+                Persona: {{ idea.persona.name }}
+              </div>
+            }
 
             <div class="flex items-center text-xs text-slate-500 mt-auto">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -203,6 +224,40 @@
               <option [value]="status">{{ status }}</option>
             }
           </select>
+        </div>
+
+        <div>
+          <label for="idea-persona" class="block text-sm font-medium text-slate-300 mb-1">Audience Persona</label>
+          <select
+            id="idea-persona"
+            [ngModel]="formPersonaId()"
+            (ngModelChange)="formPersonaId.set($event)"
+            name="personaId"
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+          >
+            <option [value]="null">None</option>
+            @for (p of personas(); track p.id) {
+              <option [value]="p.id">{{ p.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Tags</label>
+          <div class="flex flex-wrap gap-2">
+            @for (tag of availableTags(); track tag.id) {
+              <button
+                type="button"
+                (click)="toggleTag(tag.id)"
+                class="text-xs font-medium px-2.5 py-1 rounded-full border transition-all"
+                [style.border-color]="tag.color ?? '#8B5CF6'"
+                [style.color]="formTagIds().includes(tag.id) ? '#fff' : (tag.color ?? '#8B5CF6')"
+                [style.background-color]="formTagIds().includes(tag.id) ? (tag.color ?? '#8B5CF6') : 'transparent'"
+              >
+                {{ tag.name }}
+              </button>
+            }
+          </div>
         </div>
 
         @if (modalError()) {

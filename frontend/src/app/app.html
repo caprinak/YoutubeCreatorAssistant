@@ -14,30 +14,68 @@
       </h1>
     </div>
 
-    <nav class="flex-1 px-4 py-6 space-y-2">
+    <!-- Channel Selector -->
+    <div class="px-4 mb-2">
+      <label class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Topic</label>
+      @if (store.channels().length > 0) {
+        <select
+          [value]="currentChannelId() ?? ''"
+          (change)="onChannelChange($any($event.target).value)"
+          data-testid="channel-selector"
+          class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+        >
+          @for (ch of store.channels(); track ch.id) {
+            <option [value]="ch.id">{{ ch.name }} ({{ ch.handle }})</option>
+          }
+        </select>
+      } @else {
+        <div class="text-xs text-slate-500 px-2 py-1">Loading channels...</div>
+      }
+    </div>
+
+    <nav class="flex-1 px-4 py-4 space-y-2">
       <p class="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Workspace</p>
 
-      <a
-        routerLink="/ideas"
-        routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
-        class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
-        <span class="font-medium">Idea Vault</span>
-      </a>
+      @if (currentChannelId(); as cid) {
+        <a
+          [routerLink]="['/channel', cid, 'ideas']"
+          routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+          [routerLinkActiveOptions]="{ exact: true }"
+          data-testid="nav-ideas"
+          class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span class="font-medium">Idea Vault</span>
+        </a>
 
-      <a
-        routerLink="/kanban"
-        routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
-        class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-        <span class="font-medium">Kanban Board</span>
-      </a>
+        <a
+          [routerLink]="['/channel', cid, 'kanban']"
+          routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+          [routerLinkActiveOptions]="{ exact: true }"
+          data-testid="nav-kanban"
+          class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span class="font-medium">Kanban Board</span>
+        </a>
+
+        <a
+          [routerLink]="['/channel', cid, 'brand-kit']"
+          routerLinkActive="bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]"
+          [routerLinkActiveOptions]="{ exact: true }"
+          data-testid="nav-brand-kit"
+          class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all group"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span class="font-medium">Brand Kit</span>
+        </a>
+      }
     </nav>
   </aside>
 

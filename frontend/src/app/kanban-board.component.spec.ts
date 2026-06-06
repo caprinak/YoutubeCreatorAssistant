@@ -2,10 +2,10 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { KanbanBoardComponent } from './kanban-board.component';
 import { IdeaService, Idea } from './idea.service';
 import { ToastService } from './toast.service';
-import { of, throwError } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { of, throwError, BehaviorSubject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 describe('KanbanBoardComponent', () => {
@@ -13,14 +13,17 @@ describe('KanbanBoardComponent', () => {
   let comp: KanbanBoardComponent;
   let ideaServiceMock: any;
   let toastMock: any;
+  let paramMap$: BehaviorSubject<any>;
 
   const mockIdeas: Idea[] = [
-    { id: '1', title: 'Idea 1', description: 'Desc 1', status: 'RESEARCHING', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '' },
-    { id: '2', title: 'Idea 2', description: 'Desc 2', status: 'PLANNING', createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '' },
-    { id: '3', title: 'Idea 3', description: 'Desc 3', status: 'RESEARCHING', createdAt: '2026-06-03T00:00:00.000Z', updatedAt: '' },
+    { id: '1', title: 'Idea 1', description: 'Desc 1', status: 'RESEARCHING', channelId: 'ch-1', audiencePersonaId: null, createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '', persona: null, tags: [] },
+    { id: '2', title: 'Idea 2', description: 'Desc 2', status: 'PLANNING', channelId: 'ch-1', audiencePersonaId: null, createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '', persona: null, tags: [] },
+    { id: '3', title: 'Idea 3', description: 'Desc 3', status: 'RESEARCHING', channelId: 'ch-1', audiencePersonaId: null, createdAt: '2026-06-03T00:00:00.000Z', updatedAt: '', persona: null, tags: [] },
   ];
 
   beforeEach(async () => {
+    paramMap$ = new BehaviorSubject({ get: (key: string) => key === 'channelId' ? 'ch-1' : null });
+
     ideaServiceMock = {
       getIdeas: vi.fn().mockReturnValue(of(mockIdeas)),
       updateIdea: vi.fn().mockImplementation((_id, data) => of({
@@ -39,9 +42,9 @@ describe('KanbanBoardComponent', () => {
       providers: [
         { provide: IdeaService, useValue: ideaServiceMock },
         { provide: ToastService, useValue: toastMock },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (key: string) => key === 'channelId' ? 'ch-1' : null } }, paramMap: paramMap$.asObservable() } },
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
       ],
     }).compileComponents();
 
@@ -54,8 +57,8 @@ describe('KanbanBoardComponent', () => {
   });
 
   it('should load ideas on init', () => {
-    comp.ngOnInit();
-    expect(ideaServiceMock.getIdeas).toHaveBeenCalled();
+    fixture.detectChanges();
+    expect(ideaServiceMock.getIdeas).toHaveBeenCalledWith({ channelId: 'ch-1' });
     expect(comp.ideas()).toHaveLength(3);
     expect(comp.isLoading()).toBe(false);
   });
@@ -71,7 +74,7 @@ describe('KanbanBoardComponent', () => {
     comp.ideas.set([...mockIdeas]);
     comp.changeStatus(mockIdeas[0], 'COMPLETED');
     expect(comp.ideas()[0].status).toBe('COMPLETED');
-    expect(ideaServiceMock.updateIdea).toHaveBeenCalledWith('1', { status: 'COMPLETED' });
+    expect(ideaServiceMock.updateIdea).toHaveBeenCalledWith('1', { status: 'COMPLETED', channelId: 'ch-1' });
     expect(toastMock.info).toHaveBeenCalled();
   });
 

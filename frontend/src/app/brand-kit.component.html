@@ -1,0 +1,110 @@
+<section class="flex-1 flex flex-col relative overflow-hidden">
+  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-600/10 blur-[120px] rounded-full pointer-events-none z-0"></div>
+
+  <header class="h-20 flex items-center justify-between px-8 z-10 relative border-b border-slate-700/30 bg-slate-900/50 backdrop-blur-md">
+    <div>
+      <h2 class="text-2xl font-bold text-white tracking-tight">Brand Kit</h2>
+      <p class="text-sm text-slate-400 mt-1">
+        @if (channelName(); as name) {
+          Visual identity for {{ name }}
+        } @else {
+          Select a channel to view brand kit
+        }
+      </p>
+    </div>
+    @if (kit() && hasChanges()) {
+      <button
+        type="button"
+        (click)="save()"
+        [disabled]="isSaving()"
+        data-testid="brand-kit-save"
+        class="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium rounded-full text-sm px-6 py-2.5 shadow-lg shadow-violet-500/30 transition-all hover:shadow-violet-500/50 disabled:opacity-50"
+      >
+        {{ isSaving() ? 'Saving...' : 'Save Changes' }}
+      </button>
+    }
+  </header>
+
+  <div class="flex-1 overflow-auto p-8 z-10 relative">
+    @if (isLoading()) {
+      <div class="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 max-w-2xl animate-pulse h-64"></div>
+    } @else if (error()) {
+      <div class="bg-rose-500/10 border border-rose-500/30 text-rose-200 rounded-2xl p-6 max-w-xl">
+        <p>{{ error() }}</p>
+        <button (click)="load()" class="mt-2 px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors">Retry</button>
+      </div>
+    } @else if (channelId(); as cid) {
+      <div class="max-w-2xl space-y-6">
+        @if (kit(); as k) {
+          <div class="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Colors (JSON array, e.g. ["#hex1","#hex2"])</label>
+              <textarea
+                [ngModel]="colors()"
+                (ngModelChange)="colors.set($event)"
+                rows="2"
+                data-testid="brand-kit-colors"
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all font-mono text-sm"
+              ></textarea>
+              @if (parsedColors(); as cols) {
+                <div class="flex gap-2 mt-2">
+                  @for (c of cols; track $index) {
+                    <div class="w-8 h-8 rounded-full border border-slate-600" [style.background]="c" [title]="c"></div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Typography</label>
+              <input
+                type="text"
+                [ngModel]="typography()"
+                (ngModelChange)="typography.set($event)"
+                placeholder="e.g. Inter, sans-serif"
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Logo URL</label>
+              <input
+                type="text"
+                [ngModel]="logoUrl()"
+                (ngModelChange)="logoUrl.set($event)"
+                placeholder="https://..."
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Banner URL</label>
+              <input
+                type="text"
+                [ngModel]="bannerUrl()"
+                (ngModelChange)="bannerUrl.set($event)"
+                placeholder="https://..."
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+          </div>
+        } @else {
+          <div class="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-12 text-center">
+            <p class="text-slate-400">No brand kit yet for this channel.</p>
+            <button
+              (click)="create()"
+              data-testid="brand-kit-create"
+              class="mt-4 px-6 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors"
+            >
+              Create Brand Kit
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="bg-slate-800/40 border border-dashed border-slate-700/50 rounded-2xl p-12 text-center max-w-xl">
+        <p class="text-slate-400">Select a channel from the sidebar to view its brand kit.</p>
+      </div>
+    }
+  </div>
+</section>

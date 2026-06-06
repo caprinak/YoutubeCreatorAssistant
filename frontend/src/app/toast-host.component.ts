@@ -10,6 +10,9 @@ import { ToastService } from './toast.service';
     <div class="fixed bottom-6 right-6 z-[60] flex flex-col gap-2 w-80 pointer-events-none">
       @for (toast of toasts.items(); track toast.id) {
         <div
+          [attr.data-testid]="'toast-' + toast.kind"
+          [attr.data-toast-kind]="toast.kind"
+          [attr.data-message]="toast.message"
           class="pointer-events-auto rounded-xl border px-4 py-3 shadow-lg backdrop-blur-md flex items-start gap-3 animate-fade-in"
           [class.bg-emerald-500\/15]="toast.kind === 'success'"
           [class.border-emerald-500\/40]="toast.kind === 'success'"

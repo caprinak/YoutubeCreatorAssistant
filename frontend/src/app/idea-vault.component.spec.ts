@@ -1,27 +1,32 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { IdeaVaultComponent } from './idea-vault.component';
 import { IdeaService, Idea, IDEA_STATUSES } from './idea.service';
+import { ChannelService } from './channel.service';
 import { ToastService } from './toast.service';
 import { ConfirmService } from './confirm.service';
-import { of, throwError } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { of, throwError, BehaviorSubject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 describe('IdeaVaultComponent', () => {
   let fixture: ComponentFixture<IdeaVaultComponent>;
   let comp: IdeaVaultComponent;
   let ideaServiceMock: any;
+  let channelServiceMock: any;
   let toastMock: any;
   let confirmMock: any;
+  let paramMap$: BehaviorSubject<any>;
 
   const mockIdeas: Idea[] = [
-    { id: '1', title: 'Idea 1', description: 'Desc 1', status: 'RESEARCHING', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '' },
-    { id: '2', title: 'Idea 2', description: 'Desc 2', status: 'PLANNING', createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '' },
+    { id: '1', title: 'Idea 1', description: 'Desc 1', status: 'RESEARCHING', channelId: 'ch-1', audiencePersonaId: null, createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '', persona: null, tags: [] },
+    { id: '2', title: 'Idea 2', description: 'Desc 2', status: 'PLANNING', channelId: 'ch-1', audiencePersonaId: null, createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '', persona: null, tags: [] },
   ];
 
   beforeEach(async () => {
+    paramMap$ = new BehaviorSubject({ get: (key: string) => key === 'channelId' ? 'ch-1' : null });
+
     ideaServiceMock = {
       getIdeas: vi.fn().mockReturnValue(of(mockIdeas)),
       createIdea: vi.fn().mockImplementation((idea) => of({
@@ -29,6 +34,10 @@ describe('IdeaVaultComponent', () => {
         title: idea.title,
         description: idea.description || '',
         status: idea.status || 'RESEARCHING',
+        channelId: idea.channelId,
+        audiencePersonaId: idea.audiencePersonaId ?? null,
+        persona: null,
+        tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })),
@@ -37,10 +46,27 @@ describe('IdeaVaultComponent', () => {
         title: 'Updated',
         description: 'Updated desc',
         status: 'COMPLETED',
+        channelId: 'ch-1',
+        audiencePersonaId: null,
+        persona: null,
+        tags: [],
         createdAt: '2026-06-01T00:00:00.000Z',
         updatedAt: new Date().toISOString(),
       })),
       deleteIdea: vi.fn().mockReturnValue(of(undefined)),
+    };
+    channelServiceMock = {
+      getTags: vi.fn().mockReturnValue(of([])),
+      getPersonas: vi.fn().mockReturnValue(of([])),
+      getChannels: vi.fn().mockReturnValue(of([])),
+      createChannel: vi.fn(),
+      updateChannel: vi.fn(),
+      deleteChannel: vi.fn(),
+      createPersona: vi.fn(),
+      deletePersona: vi.fn(),
+      createTag: vi.fn(),
+      getBrandKit: vi.fn(),
+      updateBrandKit: vi.fn(),
     };
     toastMock = {
       success: vi.fn(),
@@ -56,11 +82,12 @@ describe('IdeaVaultComponent', () => {
       imports: [IdeaVaultComponent],
       providers: [
         { provide: IdeaService, useValue: ideaServiceMock },
+        { provide: ChannelService, useValue: channelServiceMock },
         { provide: ToastService, useValue: toastMock },
         { provide: ConfirmService, useValue: confirmMock },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (key: string) => key === 'channelId' ? 'ch-1' : null } }, paramMap: paramMap$.asObservable() } },
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
       ],
     }).compileComponents();
 
@@ -73,15 +100,15 @@ describe('IdeaVaultComponent', () => {
   });
 
   it('should load ideas on init', () => {
-    comp.ngOnInit();
-    expect(ideaServiceMock.getIdeas).toHaveBeenCalled();
+    fixture.detectChanges();
+    expect(ideaServiceMock.getIdeas).toHaveBeenCalledWith({ channelId: 'ch-1' });
     expect(comp.ideas()).toEqual(mockIdeas);
     expect(comp.isLoading()).toBe(false);
   });
 
   it('should show error on load failure', () => {
     ideaServiceMock.getIdeas.mockReturnValueOnce(throwError(() => new Error('API Error')));
-    comp.ngOnInit();
+    fixture.detectChanges();
     expect(comp.loadError()).toBeTruthy();
     expect(toastMock.error).toHaveBeenCalled();
   });
@@ -92,6 +119,8 @@ describe('IdeaVaultComponent', () => {
     expect(comp.modalMode()).toBe('create');
     expect(comp.editingId()).toBeNull();
     expect(comp.formTitle()).toBe('');
+    expect(comp.formPersonaId()).toBeNull();
+    expect(comp.formTagIds()).toEqual([]);
   });
 
   it('should open modal in edit mode', () => {
@@ -100,6 +129,7 @@ describe('IdeaVaultComponent', () => {
     expect(comp.modalMode()).toBe('edit');
     expect(comp.editingId()).toBe('1');
     expect(comp.formTitle()).toBe('Idea 1');
+    expect(comp.formPersonaId()).toBeNull();
   });
 
   it('should close modal', () => {
@@ -119,6 +149,9 @@ describe('IdeaVaultComponent', () => {
       title: 'New',
       description: 'Desc',
       status: 'RESEARCHING',
+      channelId: 'ch-1',
+      audiencePersonaId: null,
+      tagIds: [],
     });
     expect(toastMock.success).toHaveBeenCalled();
     expect(comp.isModalOpen()).toBe(false);
@@ -142,6 +175,9 @@ describe('IdeaVaultComponent', () => {
       title: 'Updated Title',
       description: 'Desc 1',
       status: 'COMPLETED',
+      channelId: 'ch-1',
+      audiencePersonaId: null,
+      tagIds: [],
     });
     expect(toastMock.success).toHaveBeenCalledWith('Idea updated.');
     expect(comp.isModalOpen()).toBe(false);
@@ -164,6 +200,7 @@ describe('IdeaVaultComponent', () => {
   });
 
   it('should log error on create failure', () => {
+    comp.channelId.set('ch-1');
     ideaServiceMock.createIdea.mockReturnValueOnce(throwError(() => new Error('Create Error')));
     comp.openCreate();
     comp.formTitle.set('New');
@@ -175,7 +212,7 @@ describe('IdeaVaultComponent', () => {
     comp.ideas.set([...mockIdeas]);
     comp.changeStatus(mockIdeas[0], 'COMPLETED');
     expect(comp.ideas()[0].status).toBe('COMPLETED');
-    expect(ideaServiceMock.updateIdea).toHaveBeenCalledWith('1', { status: 'COMPLETED' });
+    expect(ideaServiceMock.updateIdea).toHaveBeenCalledWith('1', { status: 'COMPLETED', channelId: 'ch-1' });
   });
 
   it('should roll back on status change failure', () => {
@@ -190,11 +227,11 @@ describe('IdeaVaultComponent', () => {
   });
 
   it('should return status CSS classes', () => {
-    expect(comp.statusClass('RESEARCHING')).toContain('violet');
-    expect(comp.statusClass('PLANNING')).toContain('amber');
-    expect(comp.statusClass('IN_PROGRESS')).toContain('sky');
-    expect(comp.statusClass('COMPLETED')).toContain('emerald');
-    expect(comp.statusClass('UNKNOWN')).toContain('slate');
+    expect(comp.statusBadge('RESEARCHING')).toContain('violet');
+    expect(comp.statusBadge('PLANNING')).toContain('amber');
+    expect(comp.statusBadge('IN_PROGRESS')).toContain('sky');
+    expect(comp.statusBadge('COMPLETED')).toContain('emerald');
+    expect(comp.statusBadge('UNKNOWN')).toContain('slate');
   });
 
   it('should validate title required', () => {
