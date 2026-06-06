@@ -1,0 +1,5 @@
+# AI Agent Rules
+
+## Command Bundling
+- When proposing terminal commands, always bundle sequential command steps together into a single command line (using `;` in PowerShell) so that the user only has to approve the execution once.
+- Ref: docs/BUNDLED_COMMANDS_RULE.md
