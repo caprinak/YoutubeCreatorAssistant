@@ -10,6 +10,8 @@
     "start:frontend": "npm start --prefix frontend",
     "dev": "node scripts/dev.js",
     "build": "npm run build --prefix frontend",
+    "seed": "npm run seed --prefix backend",
+    "seed:patterns": "npm run seed:patterns --prefix backend",
     "test": "npm test --prefix backend && npm test --prefix frontend",
     "test:backend": "npm test --prefix backend",
     "test:frontend": "npm test --prefix frontend"

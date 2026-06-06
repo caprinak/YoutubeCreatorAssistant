@@ -1,5 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import { randomUUID } from 'crypto';
+import fs from 'fs';
 import { PrismaClient, Prisma } from './prisma/generated/client.ts';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import 'dotenv/config';
@@ -23,12 +27,59 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGIN;
 app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
+// ── File Uploads ────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.resolve(import.meta.dirname, 'uploads');
+const UPLOADS_URL_PREFIX = '/uploads';
+const TYPE_DIR_MAP: Record<string, string> = {
+  IMAGE: 'images',
+  THUMBNAIL: 'images',
+  DIAGRAM: 'images',
+  VIDEO: 'videos',
+  AUDIO: 'audio',
+};
+
+for (const dir of Object.values(TYPE_DIR_MAP)) {
+  fs.mkdirSync(path.join(UPLOADS_DIR, 'assets', dir), { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const type = (_req.body?.type as string) ?? 'IMAGE';
+    const subdir = TYPE_DIR_MAP[type] ?? 'images';
+    cb(null, path.join(UPLOADS_DIR, 'assets', subdir));
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || '';
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+const fileUpload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
+
+app.use(UPLOADS_URL_PREFIX, express.static(UPLOADS_DIR));
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
 const IDEA_STATUSES = ['RESEARCHING', 'PLANNING', 'IN_PROGRESS', 'COMPLETED'] as const;
 type IdeaStatus = (typeof IDEA_STATUSES)[number];
+
+const ASSET_TYPES = ['AUDIO', 'VIDEO', 'IMAGE', 'THUMBNAIL', 'DIAGRAM'] as const;
+type AssetType = (typeof ASSET_TYPES)[number];
+function isAssetType(value: unknown): value is AssetType {
+  return typeof value === 'string' && (ASSET_TYPES as readonly string[]).includes(value);
+}
+
+const EPISODE_STATUSES = ['DRAFT', 'SCRIPTING', 'FILMING', 'EDITING', 'COMPLETED'] as const;
+type EpisodeStatus = (typeof EPISODE_STATUSES)[number];
+function isEpisodeStatus(value: unknown): value is EpisodeStatus {
+  return typeof value === 'string' && (EPISODE_STATUSES as readonly string[]).includes(value);
+}
 
 const TITLE_MAX = 200;
 const DESC_MAX = 5000;
@@ -248,11 +299,253 @@ app.delete('/api/ideas/:id', asyncHandler(async (req, res) => {
   res.status(HTTP.NO_CONTENT).send();
 }));
 
+// ── Assets ──────────────────────────────────────────────────────────
+
+app.get('/api/assets', asyncHandler(async (req, res) => {
+  const where: Record<string, unknown> = {};
+  if (req.query.channelId) where.channelId = String(req.query.channelId);
+  if (req.query.type) where.type = String(req.query.type);
+  if (req.query.shared === 'true') where.isShared = true;
+  const assets = await prisma.asset.findMany({ where, orderBy: { createdAt: 'desc' } });
+  res.json(assets);
+}));
+
+app.post('/api/assets', asyncHandler(async (req, res) => {
+  const { name, type, url, sizeBytes, mimeType, isShared, isSuggested, channelId } = req.body ?? {};
+  if (!isAssetType(type)) badRequest(`Asset type must be one of: ${ASSET_TYPES.join(', ')}`);
+  const asset = await prisma.asset.create({
+    data: {
+      name: requireString(name, 'Asset name'),
+      type,
+      url: requireString(url, 'Asset URL'),
+      sizeBytes: sizeBytes ?? null,
+      mimeType: mimeType ?? null,
+      isShared: isShared ?? false,
+      isSuggested: isSuggested ?? false,
+      channelId: channelId ?? null,
+    },
+  });
+  res.status(HTTP.CREATED).json(asset);
+}));
+
+app.put('/api/assets/:id', asyncHandler(async (req, res) => {
+  const { name, type, url, sizeBytes, mimeType, isShared, isSuggested } = req.body ?? {};
+  await findOrFail(() => prisma.asset.findUnique({ where: { id: req.params.id } }), 'Asset');
+  if (type != null && !isAssetType(type)) badRequest(`Asset type must be one of: ${ASSET_TYPES.join(', ')}`);
+  const asset = await prisma.asset.update({
+    where: { id: req.params.id },
+    data: {
+      ...(name != null && { name: requireString(name, 'Asset name') }),
+      ...(type != null && { type }),
+      ...(url != null && { url: requireString(url, 'Asset URL') }),
+      ...(sizeBytes !== undefined && { sizeBytes }),
+      ...(mimeType !== undefined && { mimeType }),
+      ...(isShared !== undefined && { isShared }),
+      ...(isSuggested !== undefined && { isSuggested }),
+    },
+  });
+  res.json(asset);
+}));
+
+app.delete('/api/assets/:id', asyncHandler(async (req, res) => {
+  await findOrFail(() => prisma.asset.findUnique({ where: { id: req.params.id } }), 'Asset');
+  await prisma.asset.delete({ where: { id: req.params.id } });
+  res.status(HTTP.NO_CONTENT).send();
+}));
+
+app.post('/api/assets/upload', fileUpload.single('file'), asyncHandler(async (req, res) => {
+  const file = req.file;
+  if (!file) badRequest('File is required');
+
+  const { name, type, isShared, isSuggested, channelId } = req.body ?? {};
+  if (!isAssetType(type)) badRequest(`Asset type must be one of: ${ASSET_TYPES.join(', ')}`);
+
+  const subdir = TYPE_DIR_MAP[type as string] ?? 'images';
+  const relativeUrl = `${UPLOADS_URL_PREFIX}/assets/${subdir}/${file.filename}`;
+
+  const asset = await prisma.asset.create({
+    data: {
+      name: requireString(name ?? file.originalname, 'Asset name'),
+      type,
+      url: relativeUrl,
+      sizeBytes: file.size,
+      mimeType: file.mimetype,
+      isShared: isShared === 'true',
+      isSuggested: isSuggested === 'true',
+      channelId: channelId ?? null,
+    },
+  });
+  res.status(HTTP.CREATED).json(asset);
+}));
+
+// ── Series ──────────────────────────────────────────────────────────
+
+app.get('/api/series', asyncHandler(async (req, res) => {
+  const where: Record<string, unknown> = {};
+  if (req.query.channelId) where.channelId = String(req.query.channelId);
+  const seriesList = await prisma.series.findMany({
+    where, orderBy: { createdAt: 'desc' },
+    include: { _count: { select: { episodes: true } } },
+  });
+  res.json(seriesList);
+}));
+
+app.get('/api/series/:id', asyncHandler(async (req, res) => {
+  const series = await findOrFail(
+    () => prisma.series.findUnique({ where: { id: req.params.id }, include: { _count: { select: { episodes: true } } } }),
+    'Series',
+  );
+  res.json(series);
+}));
+
+app.post('/api/series', asyncHandler(async (req, res) => {
+  const { channelId, title, description, sourceType, sourceName } = req.body ?? {};
+  if (!channelId) badRequest('channelId is required');
+  const series = await prisma.series.create({
+    data: {
+      title: requireString(title, 'Series title'),
+      channelId,
+      description: description ?? null,
+      sourceType: requireString(sourceType, 'Source type'),
+      sourceName: sourceName ?? null,
+    },
+  });
+  res.status(HTTP.CREATED).json(series);
+}));
+
+app.put('/api/series/:id', asyncHandler(async (req, res) => {
+  const { title, description, sourceType, sourceName } = req.body ?? {};
+  await findOrFail(() => prisma.series.findUnique({ where: { id: req.params.id } }), 'Series');
+  const series = await prisma.series.update({
+    where: { id: req.params.id },
+    data: {
+      ...(title != null && { title: requireString(title, 'Series title') }),
+      ...(description !== undefined && { description }),
+      ...(sourceType != null && { sourceType }),
+      ...(sourceName !== undefined && { sourceName }),
+    },
+  });
+  res.json(series);
+}));
+
+app.delete('/api/series/:id', asyncHandler(async (req, res) => {
+  await findOrFail(() => prisma.series.findUnique({ where: { id: req.params.id } }), 'Series');
+  await prisma.series.delete({ where: { id: req.params.id } });
+  res.status(HTTP.NO_CONTENT).send();
+}));
+
+// ── Episodes ────────────────────────────────────────────────────────
+
+app.get('/api/series/:id/episodes', asyncHandler(async (req, res) => {
+  await findOrFail(() => prisma.series.findUnique({ where: { id: req.params.id } }), 'Series');
+  const episodes = await prisma.episode.findMany({
+    where: { seriesId: req.params.id },
+    orderBy: { episodeNumber: 'asc' },
+    include: { assets: true },
+  });
+  res.json(episodes);
+}));
+
+app.post('/api/episodes', asyncHandler(async (req, res) => {
+  const { seriesId, episodeNumber, title, description, content, status } = req.body ?? {};
+  if (!seriesId) badRequest('seriesId is required');
+  if (status != null && !isEpisodeStatus(status)) badRequest(`Status must be one of: ${EPISODE_STATUSES.join(', ')}`);
+  const episode = await prisma.episode.create({
+    data: {
+      seriesId,
+      episodeNumber,
+      title: requireString(title, 'Episode title'),
+      description: description ?? null,
+      content: content ?? null,
+      status: status ?? 'DRAFT',
+    },
+  });
+  res.status(HTTP.CREATED).json(episode);
+}));
+
+app.put('/api/episodes/:id', asyncHandler(async (req, res) => {
+  const { title, description, content, status, episodeNumber } = req.body ?? {};
+  if (status != null && !isEpisodeStatus(status)) badRequest(`Status must be one of: ${EPISODE_STATUSES.join(', ')}`);
+  await findOrFail(() => prisma.episode.findUnique({ where: { id: req.params.id } }), 'Episode');
+  const episode = await prisma.episode.update({
+    where: { id: req.params.id },
+    data: {
+      ...(title != null && { title: requireString(title, 'Episode title') }),
+      ...(description !== undefined && { description }),
+      ...(content !== undefined && { content }),
+      ...(status != null && { status }),
+      ...(episodeNumber != null && { episodeNumber }),
+    },
+  });
+  res.json(episode);
+}));
+
+app.post('/api/episodes/:id/assets', asyncHandler(async (req, res) => {
+  const { assetId } = req.body ?? {};
+  if (!assetId) badRequest('assetId is required');
+  await findOrFail(() => prisma.episode.findUnique({ where: { id: req.params.id } }), 'Episode');
+  await findOrFail(() => prisma.asset.findUnique({ where: { id: assetId } }), 'Asset');
+
+  const episode = await prisma.episode.update({
+    where: { id: req.params.id },
+    data: {
+      assets: { connect: { id: assetId } }
+    },
+    include: { assets: true }
+  });
+  res.json(episode);
+}));
+
+app.delete('/api/episodes/:id/assets/:assetId', asyncHandler(async (req, res) => {
+  await findOrFail(() => prisma.episode.findUnique({ where: { id: req.params.id } }), 'Episode');
+  
+  const episode = await prisma.episode.update({
+    where: { id: req.params.id },
+    data: {
+      assets: { disconnect: { id: req.params.assetId } }
+    },
+    include: { assets: true }
+  });
+  res.json(episode);
+}));
+
+app.delete('/api/episodes/:id', asyncHandler(async (req, res) => {
+  await findOrFail(() => prisma.episode.findUnique({ where: { id: req.params.id } }), 'Episode');
+  await prisma.episode.delete({ where: { id: req.params.id } });
+  res.status(HTTP.NO_CONTENT).send();
+}));
+
+// ── Batch Import ────────────────────────────────────────────────────
+
+app.post('/api/series/:id/import-episodes', asyncHandler(async (req, res) => {
+  const series = await findOrFail(() => prisma.series.findUnique({ where: { id: req.params.id } }), 'Series');
+  const { episodes } = req.body ?? {};
+  if (!Array.isArray(episodes) || episodes.length === 0) badRequest('episodes must be a non-empty array');
+
+  const data = episodes.map((ep: { episodeNumber: number; title: string; description?: string; content?: string }, idx: number) => ({
+    seriesId: series.id,
+    episodeNumber: ep.episodeNumber ?? idx + 1,
+    title: requireString(ep.title, `Episode ${idx + 1} title`),
+    description: ep.description ?? null,
+    content: ep.content ?? null,
+  }));
+
+  await prisma.episode.createMany({ data });
+  const created = await prisma.episode.findMany({
+    where: { seriesId: req.params.id },
+    orderBy: { episodeNumber: 'asc' },
+  });
+  res.status(HTTP.CREATED).json(created);
+}));
+
 // ── Error Handler ───────────────────────────────────────────────────
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message });
+  }
+  if (err instanceof multer.MulterError) {
+    return res.status(HTTP.BAD_REQUEST).json({ error: err.message });
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2025') return res.status(HTTP.NOT_FOUND).json({ error: 'Record not found' });

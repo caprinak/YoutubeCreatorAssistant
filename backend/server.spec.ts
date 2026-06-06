@@ -50,6 +50,44 @@ interface TagRecord {
   createdAt: string;
 }
 
+interface AssetRecord {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  sizeBytes: number | null;
+  mimeType: string | null;
+  isShared: boolean;
+  isSuggested: boolean;
+  channelId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SeriesRecord {
+  id: string;
+  channelId: string;
+  title: string;
+  description: string | null;
+  sourceType: string;
+  sourceName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { episodes: number };
+}
+
+interface EpisodeRecord {
+  id: string;
+  seriesId: string;
+  episodeNumber: number;
+  title: string;
+  description: string | null;
+  content: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const { mockDb, mockPrisma, resetMockDb } = vi.hoisted(() => {
   const channels: ChannelRecord[] = [];
   const personas: PersonaRecord[] = [];
@@ -57,10 +95,16 @@ const { mockDb, mockPrisma, resetMockDb } = vi.hoisted(() => {
   const tags: TagRecord[] = [];
   const ideas: IdeaRecord[] = [];
   const ideaTags: { ideaId: string; tagId: string }[] = [];
+  const assets: AssetRecord[] = [];
+  const seriesList: SeriesRecord[] = [];
+  const episodes: EpisodeRecord[] = [];
   let nextChannelId = 1;
   let nextPersonaId = 1;
   let nextTagId = 1;
   let nextIdeaId = 1;
+  let nextAssetId = 1;
+  let nextSeriesId = 1;
+  let nextEpisodeId = 1;
 
   function addInclude(result: any, include?: any) {
     if (include?.persona) result.persona = personas.find((p) => p.id === result.audiencePersonaId) ?? null;
@@ -210,6 +254,153 @@ const { mockDb, mockPrisma, resetMockDb } = vi.hoisted(() => {
         return Promise.resolve(removed);
       },
     },
+    asset: {
+      findMany: ({ where }: { where?: Record<string, unknown> } = {}) => {
+        let items = [...assets];
+        if (where?.channelId) items = items.filter((a) => a.channelId === where.channelId);
+        if (where?.type) items = items.filter((a) => a.type === where.type);
+        if (where?.isShared) items = items.filter((a) => a.isShared);
+        return Promise.resolve(items);
+      },
+      findUnique: ({ where: { id } }: { where: { id: string } }) => {
+        return Promise.resolve(assets.find((a) => a.id === id) ?? null);
+      },
+      create: ({ data }: { data: Record<string, unknown> }) => {
+        const now = new Date().toISOString();
+        const asset: AssetRecord = {
+          id: String(nextAssetId++),
+          name: data.name as string,
+          type: data.type as string,
+          url: data.url as string,
+          sizeBytes: (data.sizeBytes as number) ?? null,
+          mimeType: (data.mimeType as string) ?? null,
+          isShared: (data.isShared as boolean) ?? false,
+          isSuggested: (data.isSuggested as boolean) ?? false,
+          channelId: (data.channelId as string) ?? null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        assets.push(asset);
+        return Promise.resolve(asset);
+      },
+      update: ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const asset = assets.find((a) => a.id === where.id);
+        if (!asset) return Promise.reject(new Error('Not found'));
+        Object.assign(asset, data, { updatedAt: new Date().toISOString() });
+        return Promise.resolve(asset);
+      },
+      delete: ({ where: { id } }: { where: { id: string } }) => {
+        const idx = assets.findIndex((a) => a.id === id);
+        if (idx === -1) return Promise.reject(new Error('Not found'));
+        const [removed] = assets.splice(idx, 1);
+        return Promise.resolve(removed);
+      },
+    },
+    series: {
+      findMany: ({ where, include }: { where?: Record<string, unknown>; include?: any } = {}) => {
+        let items = [...seriesList];
+        if (where?.channelId) items = items.filter((s) => s.channelId === where.channelId);
+        return Promise.resolve(items.map((s) => {
+          const result = { ...s };
+          if (include?._count?.select?.episodes) {
+            result._count = { episodes: episodes.filter((e) => e.seriesId === s.id).length };
+          }
+          return result;
+        }));
+      },
+      findUnique: ({ where: { id }, include }: { where: { id: string }; include?: any }) => {
+        const s = seriesList.find((x) => x.id === id);
+        if (!s) return Promise.resolve(null);
+        const result = { ...s };
+        if (include?._count?.select?.episodes) {
+          result._count = { episodes: episodes.filter((e) => e.seriesId === s.id).length };
+        }
+        return Promise.resolve(result);
+      },
+      create: ({ data }: { data: Record<string, unknown> }) => {
+        const now = new Date().toISOString();
+        const s: SeriesRecord = {
+          id: String(nextSeriesId++),
+          channelId: data.channelId as string,
+          title: data.title as string,
+          description: (data.description as string) ?? null,
+          sourceType: data.sourceType as string,
+          sourceName: (data.sourceName as string) ?? null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        seriesList.push(s);
+        return Promise.resolve(s);
+      },
+      update: ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const s = seriesList.find((x) => x.id === where.id);
+        if (!s) return Promise.reject(new Error('Not found'));
+        Object.assign(s, data, { updatedAt: new Date().toISOString() });
+        return Promise.resolve(s);
+      },
+      delete: ({ where: { id } }: { where: { id: string } }) => {
+        const idx = seriesList.findIndex((x) => x.id === id);
+        if (idx === -1) return Promise.reject(new Error('Not found'));
+        const [removed] = seriesList.splice(idx, 1);
+        return Promise.resolve(removed);
+      },
+    },
+    episode: {
+      findMany: ({ where, orderBy }: { where?: { seriesId?: string }; orderBy?: { episodeNumber?: 'asc' } } = {}) => {
+        let items = [...episodes];
+        if (where?.seriesId) items = items.filter((e) => e.seriesId === where.seriesId);
+        if (orderBy?.episodeNumber === 'asc') items.sort((a, b) => a.episodeNumber - b.episodeNumber);
+        return Promise.resolve(items);
+      },
+      findUnique: ({ where: { id } }: { where: { id: string } }) => {
+        return Promise.resolve(episodes.find((e) => e.id === id) ?? null);
+      },
+      create: ({ data }: { data: Record<string, unknown> }) => {
+        const now = new Date().toISOString();
+        const ep: EpisodeRecord = {
+          id: String(nextEpisodeId++),
+          seriesId: data.seriesId as string,
+          episodeNumber: data.episodeNumber as number,
+          title: data.title as string,
+          description: (data.description as string) ?? null,
+          content: (data.content as string) ?? null,
+          status: (data.status as string) ?? 'DRAFT',
+          createdAt: now,
+          updatedAt: now,
+        };
+        episodes.push(ep);
+        return Promise.resolve(ep);
+      },
+      update: ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const ep = episodes.find((e) => e.id === where.id);
+        if (!ep) return Promise.reject(new Error('Not found'));
+        Object.assign(ep, data, { updatedAt: new Date().toISOString() });
+        return Promise.resolve(ep);
+      },
+      delete: ({ where: { id } }: { where: { id: string } }) => {
+        const idx = episodes.findIndex((e) => e.id === id);
+        if (idx === -1) return Promise.reject(new Error('Not found'));
+        const [removed] = episodes.splice(idx, 1);
+        return Promise.resolve(removed);
+      },
+      createMany: ({ data }: { data: { seriesId: string; episodeNumber: number; title: string; description?: string | null; content?: string | null }[] }) => {
+        const now = new Date().toISOString();
+        for (const d of data) {
+          episodes.push({
+            id: String(nextEpisodeId++),
+            seriesId: d.seriesId,
+            episodeNumber: d.episodeNumber,
+            title: d.title,
+            description: d.description ?? null,
+            content: d.content ?? null,
+            status: 'DRAFT',
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+        return Promise.resolve({ count: data.length });
+      },
+    },
     ideaTag: {
       deleteMany: ({ where }: { where: { ideaId: string } }) => {
         const count = ideaTags.filter((it) => it.ideaId === where.ideaId).length;
@@ -231,14 +422,20 @@ const { mockDb, mockPrisma, resetMockDb } = vi.hoisted(() => {
     tags.length = 0;
     ideas.length = 0;
     ideaTags.length = 0;
+    assets.length = 0;
+    seriesList.length = 0;
+    episodes.length = 0;
     nextChannelId = 1;
     nextPersonaId = 1;
     nextTagId = 1;
     nextIdeaId = 1;
+    nextAssetId = 1;
+    nextSeriesId = 1;
+    nextEpisodeId = 1;
   };
 
   function setNextIdeaId(n: number) { nextIdeaId = n; }
-  return { mockDb: { channels, personas, brandKits, tags, ideas, ideaTags, setNextIdeaId }, mockPrisma: prisma, resetMockDb: reset };
+  return { mockDb: { channels, personas, brandKits, tags, ideas, ideaTags, setNextIdeaId, assets, series: seriesList, episodes }, mockPrisma: prisma, resetMockDb: reset };
 });
 
 const { PrismaClientKnownRequestError } = vi.hoisted(() => {
@@ -593,6 +790,390 @@ describe('Ideas API', () => {
 
     it('should return 404 when deleting a missing idea', async () => {
       await request(app).delete('/api/ideas/999').expect(404);
+    });
+  });
+});
+
+// ── Assets API ──────────────────────────────────────────────────────
+
+describe('Assets API', () => {
+  beforeEach(() => { seedBase(); });
+
+  describe('GET /api/assets', () => {
+    it('should list assets', async () => {
+      const res = await request(app).get('/api/assets').expect(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('should filter by channelId', async () => {
+      mockDb.assets.push({
+        id: 'a-1', name: 'Test Asset', type: 'IMAGE', url: 'http://example.com/img.png',
+        sizeBytes: null, mimeType: null, isShared: false, isSuggested: false,
+        channelId: CHANNEL_ID, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+      const res = await request(app).get(`/api/assets?channelId=${CHANNEL_ID}`).expect(200);
+      expect(res.body).toHaveLength(1);
+    });
+  });
+
+  describe('POST /api/assets', () => {
+    it('should create an asset', async () => {
+      const res = await request(app)
+        .post('/api/assets')
+        .send({ name: 'My Image', type: 'IMAGE', url: 'http://example.com/img.png', channelId: CHANNEL_ID })
+        .expect(201);
+      expect(res.body.name).toBe('My Image');
+      expect(res.body.type).toBe('IMAGE');
+      expect(mockDb.assets).toHaveLength(1);
+    });
+
+    it('should reject invalid type', async () => {
+      await request(app)
+        .post('/api/assets')
+        .send({ name: 'Bad', type: 'GIF', url: 'http://example.com/g.gif', channelId: CHANNEL_ID })
+        .expect(400);
+    });
+
+    it('should reject missing name', async () => {
+      await request(app)
+        .post('/api/assets')
+        .send({ type: 'IMAGE', url: 'http://example.com/img.png' })
+        .expect(400);
+    });
+  });
+
+  describe('PUT /api/assets/:id', () => {
+    it('should update an asset', async () => {
+      const created = await request(app)
+        .post('/api/assets')
+        .send({ name: 'Original', type: 'IMAGE', url: 'http://example.com/img.png', channelId: CHANNEL_ID });
+      const res = await request(app)
+        .put(`/api/assets/${created.body.id}`)
+        .send({ name: 'Updated' })
+        .expect(200);
+      expect(res.body.name).toBe('Updated');
+    });
+
+    it('should return 404 for missing asset', async () => {
+      await request(app).put('/api/assets/999').send({ name: 'x' }).expect(404);
+    });
+  });
+
+  describe('DELETE /api/assets/:id', () => {
+    it('should delete an asset', async () => {
+      const created = await request(app)
+        .post('/api/assets')
+        .send({ name: 'To Delete', type: 'VIDEO', url: 'http://example.com/v.mp4', channelId: CHANNEL_ID });
+      await request(app).delete(`/api/assets/${created.body.id}`).expect(204);
+      expect(mockDb.assets).toHaveLength(0);
+    });
+
+    it('should return 404 for missing asset', async () => {
+      await request(app).delete('/api/assets/999').expect(404);
+    });
+  });
+
+  describe('POST /api/assets/upload', () => {
+    it('should upload a file and create asset', async () => {
+      const res = await request(app)
+        .post('/api/assets/upload')
+        .field('name', 'Test Upload')
+        .field('type', 'IMAGE')
+        .field('channelId', CHANNEL_ID)
+        .attach('file', Buffer.from('fake-image-data'), 'test.png')
+        .expect(201);
+      expect(res.body.name).toBe('Test Upload');
+      expect(res.body.type).toBe('IMAGE');
+      expect(res.body.mimeType).toBe('image/png');
+      expect(res.body.sizeBytes).toBe(15);
+      expect(res.body.url).toMatch(/^\/uploads\/assets\/images\//);
+      expect(mockDb.assets).toHaveLength(1);
+    });
+
+    it('should use filename as name when name not provided', async () => {
+      const res = await request(app)
+        .post('/api/assets/upload')
+        .field('type', 'IMAGE')
+        .field('channelId', CHANNEL_ID)
+        .attach('file', Buffer.from('data'), 'logo.png')
+        .expect(201);
+      expect(res.body.name).toBe('logo.png');
+    });
+
+    it('should reject invalid type', async () => {
+      await request(app)
+        .post('/api/assets/upload')
+        .field('type', 'GIF')
+        .field('channelId', CHANNEL_ID)
+        .attach('file', Buffer.from('data'), 'test.gif')
+        .expect(400);
+    });
+
+    it('should reject missing file', async () => {
+      await request(app)
+        .post('/api/assets/upload')
+        .field('name', 'No File')
+        .field('type', 'IMAGE')
+        .field('channelId', CHANNEL_ID)
+        .expect(400);
+    });
+  });
+});
+
+// ── Series API ──────────────────────────────────────────────────────
+
+describe('Series API', () => {
+  beforeEach(() => { seedBase(); });
+
+  describe('GET /api/series', () => {
+    it('should list series', async () => {
+      const res = await request(app).get('/api/series').expect(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('should include episode count', async () => {
+      const created = await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, title: 'Test Series', sourceType: 'TOPIC' });
+      mockDb.episodes.push({
+        id: 'e-1', seriesId: created.body.id, episodeNumber: 1, title: 'Ep 1',
+        description: null, content: null, status: 'DRAFT',
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+      const res = await request(app).get('/api/series').expect(200);
+      expect(res.body[0]._count.episodes).toBe(1);
+    });
+  });
+
+  describe('POST /api/series', () => {
+    it('should create a series', async () => {
+      const res = await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, title: 'Clean Code Series', sourceType: 'BOOK', sourceName: 'Clean Code' })
+        .expect(201);
+      expect(res.body.title).toBe('Clean Code Series');
+      expect(res.body.sourceType).toBe('BOOK');
+      expect(mockDb.series).toHaveLength(1);
+    });
+
+    it('should reject missing title', async () => {
+      await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, sourceType: 'TOPIC' })
+        .expect(400);
+    });
+
+    it('should reject missing channelId', async () => {
+      await request(app)
+        .post('/api/series')
+        .send({ title: 'x', sourceType: 'TOPIC' })
+        .expect(400);
+    });
+  });
+
+  describe('PUT /api/series/:id', () => {
+    it('should update a series', async () => {
+      const created = await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, title: 'Original', sourceType: 'CUSTOM' });
+      const res = await request(app)
+        .put(`/api/series/${created.body.id}`)
+        .send({ title: 'Updated' })
+        .expect(200);
+      expect(res.body.title).toBe('Updated');
+    });
+
+    it('should return 404 for missing series', async () => {
+      await request(app).put('/api/series/999').send({ title: 'x' }).expect(404);
+    });
+  });
+
+  describe('DELETE /api/series/:id', () => {
+    it('should delete a series', async () => {
+      const created = await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, title: 'Delete Me', sourceType: 'TOPIC' });
+      await request(app).delete(`/api/series/${created.body.id}`).expect(204);
+      await request(app).get('/api/series').expect(200);
+    });
+  });
+
+  describe('GET /api/series/:id', () => {
+    it('should return a single series with episode count', async () => {
+      const created = await request(app)
+        .post('/api/series')
+        .send({ channelId: CHANNEL_ID, title: 'Single Series', sourceType: 'TOPIC', description: 'A test' });
+      mockDb.episodes.push({
+        id: 'e-1', seriesId: created.body.id, episodeNumber: 1, title: 'Ep 1',
+        description: null, content: null, status: 'DRAFT',
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+      const res = await request(app).get(`/api/series/${created.body.id}`).expect(200);
+      expect(res.body.title).toBe('Single Series');
+      expect(res.body.description).toBe('A test');
+      expect(res.body._count.episodes).toBe(1);
+    });
+
+    it('should return 404 for missing series', async () => {
+      await request(app).get('/api/series/999').expect(404);
+    });
+  });
+});
+
+// ── Episodes API ────────────────────────────────────────────────────
+
+describe('Episodes API', () => {
+  let seriesId: string;
+
+  beforeEach(async () => {
+    seedBase();
+    const res = await request(app)
+      .post('/api/series')
+      .send({ channelId: CHANNEL_ID, title: 'Test Series', sourceType: 'TOPIC' });
+    seriesId = res.body.id;
+  });
+
+  describe('GET /api/series/:id/episodes', () => {
+    it('should list episodes ordered by episodeNumber', async () => {
+      mockDb.episodes.push(
+        { id: 'e-1', seriesId, episodeNumber: 2, title: 'Ep 2', description: null, content: null, status: 'DRAFT', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { id: 'e-2', seriesId, episodeNumber: 1, title: 'Ep 1', description: null, content: null, status: 'DRAFT', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+      );
+      const res = await request(app).get(`/api/series/${seriesId}/episodes`).expect(200);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].episodeNumber).toBe(1);
+      expect(res.body[1].episodeNumber).toBe(2);
+    });
+
+    it('should return 404 for missing series', async () => {
+      await request(app).get('/api/series/999/episodes').expect(404);
+    });
+  });
+
+  describe('POST /api/episodes', () => {
+    it('should create an episode', async () => {
+      const res = await request(app)
+        .post('/api/episodes')
+        .send({ seriesId, episodeNumber: 1, title: 'Introduction', content: 'Script content', status: 'SCRIPTING' })
+        .expect(201);
+      expect(res.body.title).toBe('Introduction');
+      expect(res.body.status).toBe('SCRIPTING');
+      expect(res.body.episodeNumber).toBe(1);
+    });
+
+    it('should default status to DRAFT', async () => {
+      const res = await request(app)
+        .post('/api/episodes')
+        .send({ seriesId, episodeNumber: 1, title: 'Draft Ep' })
+        .expect(201);
+      expect(res.body.status).toBe('DRAFT');
+    });
+
+    it('should reject invalid status', async () => {
+      await request(app)
+        .post('/api/episodes')
+        .send({ seriesId, episodeNumber: 1, title: 'Bad', status: 'BOGUS' })
+        .expect(400);
+    });
+
+    it('should reject missing seriesId', async () => {
+      await request(app)
+        .post('/api/episodes')
+        .send({ episodeNumber: 1, title: 'No Series' })
+        .expect(400);
+    });
+  });
+
+  describe('PUT /api/episodes/:id', () => {
+    it('should update an episode', async () => {
+      const created = await request(app)
+        .post('/api/episodes')
+        .send({ seriesId, episodeNumber: 1, title: 'Original' });
+      const res = await request(app)
+        .put(`/api/episodes/${created.body.id}`)
+        .send({ title: 'Updated', status: 'COMPLETED' })
+        .expect(200);
+      expect(res.body.title).toBe('Updated');
+      expect(res.body.status).toBe('COMPLETED');
+    });
+
+    it('should return 404 for missing episode', async () => {
+      await request(app).put('/api/episodes/999').send({ title: 'x' }).expect(404);
+    });
+  });
+
+  describe('DELETE /api/episodes/:id', () => {
+    it('should delete an episode', async () => {
+      const created = await request(app)
+        .post('/api/episodes')
+        .send({ seriesId, episodeNumber: 1, title: 'To Delete' });
+      await request(app).delete(`/api/episodes/${created.body.id}`).expect(204);
+    });
+
+    it('should return 404 for missing episode', async () => {
+      await request(app).delete('/api/episodes/999').expect(404);
+    });
+  });
+});
+
+// ── Batch Import API ────────────────────────────────────────────────
+
+describe('Batch Import API', () => {
+  let seriesId: string;
+
+  beforeEach(async () => {
+    seedBase();
+    const res = await request(app)
+      .post('/api/series')
+      .send({ channelId: CHANNEL_ID, title: 'Series for Import', sourceType: 'TOPIC' });
+    seriesId = res.body.id;
+  });
+
+  describe('POST /api/series/:id/import-episodes', () => {
+    it('should bulk-insert episodes', async () => {
+      const episodesPayload = [
+        { episodeNumber: 1, title: 'Getting Started', content: 'Outline for ep 1' },
+        { episodeNumber: 2, title: 'Deep Dive', content: 'Outline for ep 2' },
+        { episodeNumber: 3, title: 'Conclusion', content: 'Wrap up' },
+      ];
+      const res = await request(app)
+        .post(`/api/series/${seriesId}/import-episodes`)
+        .send({ episodes: episodesPayload })
+        .expect(201);
+      expect(res.body).toHaveLength(3);
+      expect(res.body[0].title).toBe('Getting Started');
+      expect(res.body[2].episodeNumber).toBe(3);
+    });
+
+    it('should auto-assign episode numbers', async () => {
+      const res = await request(app)
+        .post(`/api/series/${seriesId}/import-episodes`)
+        .send({ episodes: [{ title: 'First' }, { title: 'Second' }] })
+        .expect(201);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0].episodeNumber).toBe(1);
+      expect(res.body[1].episodeNumber).toBe(2);
+    });
+
+    it('should reject empty array', async () => {
+      await request(app)
+        .post(`/api/series/${seriesId}/import-episodes`)
+        .send({ episodes: [] })
+        .expect(400);
+    });
+
+    it('should reject missing episodes field', async () => {
+      await request(app)
+        .post(`/api/series/${seriesId}/import-episodes`)
+        .send({})
+        .expect(400);
+    });
+
+    it('should return 404 for missing series', async () => {
+      await request(app)
+        .post('/api/series/999/import-episodes')
+        .send({ episodes: [{ title: 'Orphan' }] })
+        .expect(404);
     });
   });
 });
