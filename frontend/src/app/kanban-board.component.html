@@ -44,6 +44,7 @@
                     <select
                       [value]="idea.status"
                       (change)="changeStatus(idea, $any($event.target).value)"
+                      data-testid="status-select"
                       class="text-[10px] font-medium bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 text-slate-300 outline-none cursor-pointer"
                     >
                       @for (s of columns; track s) {

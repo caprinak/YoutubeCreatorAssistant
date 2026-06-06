@@ -158,6 +158,14 @@ describe('CreatorHub E2E — Full Feature Coverage', () => {
       cy.logToConsole( 'Validation works');
     });
 
+    it('closes create modal when clicking Cancel', () => {
+      cy.get('[data-testid="new-idea-button"]').click();
+      cy.get('[data-testid="idea-modal"]').should('be.visible');
+      cy.contains('button', 'Cancel').click();
+      cy.get('[data-testid="idea-modal"]').should('not.exist');
+      cy.logToConsole( 'Cancel modal works');
+    });
+
     it('creates a new idea with valid data', () => {
       const beforeCount = 0;
       cy.get('[data-testid="idea-card"]').its('length').then((n) => {
